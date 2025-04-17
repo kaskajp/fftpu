@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import AppKit
 
 struct MenuBarView: View {
     @EnvironmentObject private var appState: AppState
@@ -9,6 +10,7 @@ struct MenuBarView: View {
     @Query private var ftpSettings: [FTPSettings]
     
     @State private var dragOver = false
+    @State private var isShowingFilePicker = false
     
     // Function to open settings provided by the app
     var openSettings: () -> Void
@@ -37,7 +39,7 @@ struct MenuBarView: View {
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(0.2))
             
-            // Drop zone
+            // Drop zone - now also clickable
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(style: StrokeStyle(lineWidth: 2, dash: [6]))
@@ -49,7 +51,7 @@ struct MenuBarView: View {
                 VStack {
                     Image(systemName: "arrow.up.doc")
                         .font(.system(size: 24))
-                    Text("Drop files here")
+                    Text("Drop files here or click to browse")
                         .font(.subheadline)
                 }
             }
@@ -63,6 +65,9 @@ struct MenuBarView: View {
                     }
                 }
                 return true
+            }
+            .onTapGesture {
+                openFilePicker()
             }
             
             Divider()
@@ -120,6 +125,19 @@ struct MenuBarView: View {
             if ftpSettings.isEmpty {
                 let defaultSettings = FTPSettings()
                 modelContext.insert(defaultSettings)
+            }
+        }
+    }
+    
+    private func openFilePicker() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                uploadFile(url: url)
             }
         }
     }
