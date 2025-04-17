@@ -18,6 +18,10 @@ struct FFTPUApp: App {
     // Settings window manager - initialized in init
     private let settingsManager: SettingsWindowManager
     
+    // Status item manager for handling drag and drop on the menu bar
+    private let statusItemManager = StatusItemManager()
+    @State private var popover: NSPopover? = nil
+    
     init() {
         // Initialize the model container first
         let schema = Schema([
@@ -44,17 +48,86 @@ struct FFTPUApp: App {
     }
     
     var body: some Scene {
-        // Menu Bar Extra
-        MenuBarExtra("FFTPU", systemImage: "arrow.up.to.line") {
-            MenuBarView(openSettings: { 
-                // Update the settings manager with the current appState
-                settingsManager.updateAppState(appState)
-                settingsManager.showSettingsWindow()
-            })
-            .environmentObject(appState)
-            .modelContainer(sharedModelContainer)
+        WindowGroup(id: "hidden") {
+            Color.clear
+                .frame(width: 0, height: 0)
+                .onAppear {
+                    setupStatusItem()
+                }
         }
-        .menuBarExtraStyle(.window)
+        .defaultSize(width: 0, height: 0)
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+    }
+    
+    private func setupStatusItem() {
+        // Create popover for the menu
+        let newPopover = NSPopover()
+        newPopover.contentSize = NSSize(width: 300, height: 400)
+        newPopover.behavior = .transient
+        
+        // Set content view for the popover
+        let menuView = MenuBarView(openSettings: { 
+            // Update the settings manager with the current appState
+            settingsManager.updateAppState(appState)
+            settingsManager.showSettingsWindow()
+        })
+        .environmentObject(appState)
+        .modelContainer(sharedModelContainer)
+        
+        newPopover.contentViewController = NSHostingController(rootView: menuView)
+        self.popover = newPopover
+        
+        // Set up the status item with drag and drop handling
+        statusItemManager.setupStatusItem { url in
+            // This closure is called when a file is dropped on the status item
+            DispatchQueue.main.async {
+                // Create FTPService and upload file
+                let modelContext = self.sharedModelContainer.mainContext
+                
+                // Query for FTPSettings
+                let fetchDescriptor = FetchDescriptor<FTPSettings>()
+                let ftpSettings = try? modelContext.fetch(fetchDescriptor)
+                let ftpService = FTPService(settings: ftpSettings?.first ?? FTPSettings())
+                
+                // Create UploadedFile record
+                let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+                let uploadedFile = UploadedFile(
+                    filename: url.lastPathComponent,
+                    originalPath: url.path,
+                    uploadSize: fileSize
+                )
+                
+                // Insert into model context and update app state
+                modelContext.insert(uploadedFile)
+                self.appState.currentUpload = uploadedFile
+                
+                // Start upload
+                Task { @MainActor in
+                    do {
+                        let remoteURL = try await ftpService.uploadFile(localURL: url, uploadedFile: uploadedFile)
+                        
+                        uploadedFile.remoteURL = remoteURL
+                        uploadedFile.isUploading = false
+                        uploadedFile.uploadProgress = 1.0
+                        self.appState.currentUpload = nil
+                        
+                        // Copy URL to clipboard automatically
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(remoteURL, forType: .string)
+                    } catch {
+                        uploadedFile.isUploading = false
+                        uploadedFile.errorMessage = error.localizedDescription
+                        self.appState.currentUpload = nil
+                    }
+                }
+            }
+        }
+        
+        // Set the popover to the status item manager
+        if let popover = self.popover {
+            statusItemManager.setPopover(popover)
+        }
     }
 }
 
