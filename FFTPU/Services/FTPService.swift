@@ -35,9 +35,23 @@ class FTPService {
             .appendingPathExtension("log")
         FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
         
-        // Build the curl command
+        // Build the curl command with the specified path
         let protocolType = settings.useSFTP ? "sftp" : "ftp"
-        let curlURL = "\(protocolType)://\(settings.ftpServerURL):\(settings.ftpPort)/\(localURL.lastPathComponent)"
+        
+        // Normalize path to ensure it starts with / and doesn't end with /
+        var normalizedPath = settings.ftpPath
+        if !normalizedPath.hasPrefix("/") {
+            normalizedPath = "/" + normalizedPath
+        }
+        if normalizedPath.hasSuffix("/") {
+            normalizedPath.removeLast()
+        }
+        // Handle root directory specially
+        if normalizedPath == "" {
+            normalizedPath = "/"
+        }
+        
+        let curlURL = "\(protocolType)://\(settings.ftpServerURL):\(settings.ftpPort)\(normalizedPath)/\(localURL.lastPathComponent)"
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/curl")

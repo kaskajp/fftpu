@@ -49,6 +49,11 @@ struct SettingsView: View {
                             }
                         }
                         
+                        LabeledContent("Upload Path") {
+                            TextField("", text: $settings.ftpPath)
+                                .help("Directory on the server where files will be uploaded (e.g., /public_html/uploads)")
+                        }
+                        
                         LabeledContent("Use SFTP") {
                             Toggle("", isOn: $settings.useSFTP)
                                 .labelsHidden()

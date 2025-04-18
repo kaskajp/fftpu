@@ -9,6 +9,7 @@ final class FTPSettings {
     var ftpPort: Int
     var useSFTP: Bool
     var webServerURL: String
+    var ftpPath: String
     
     init(
         ftpServerURL: String = "",
@@ -16,7 +17,8 @@ final class FTPSettings {
         ftpPassword: String = "",
         ftpPort: Int = 21,
         useSFTP: Bool = false,
-        webServerURL: String = ""
+        webServerURL: String = "",
+        ftpPath: String = "/"
     ) {
         self.ftpServerURL = ftpServerURL
         self.ftpUsername = ftpUsername
@@ -24,5 +26,6 @@ final class FTPSettings {
         self.ftpPort = ftpPort
         self.useSFTP = useSFTP
         self.webServerURL = webServerURL
+        self.ftpPath = ftpPath
     }
 } 

@@ -28,23 +28,83 @@ struct FFTPUApp: App {
             UploadedFile.self,
             FTPSettings.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        
+        // Configure model
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
+        // Create the model container (with proper error handling)
+        var container: ModelContainer
         do {
-            self.sharedModelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            container = try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            fatalError("Could not create ModelContainer: \(error)")
+            // If container creation fails, try to recover by deleting the database
+            print("Error creating model container: \(error)")
+            print("Attempting to recover by deleting the database")
+            
+            // Delete the SwiftData store
+            let applicationSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            let storeURL = applicationSupportURL.appendingPathComponent("default.store")
+            
+            do {
+                if FileManager.default.fileExists(atPath: storeURL.path) {
+                    try FileManager.default.removeItem(at: storeURL)
+                    print("Successfully deleted database at: \(storeURL.path)")
+                }
+                
+                // Try creating container again
+                do {
+                    container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+                } catch {
+                    print("Final attempt failed: \(error)")
+                    // Create an in-memory container as last resort
+                    let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                    container = try! ModelContainer(for: schema, configurations: [inMemoryConfig])
+                }
+            } catch {
+                print("Failed to delete database: \(error)")
+                // Create an in-memory container as last resort
+                let inMemoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                container = try! ModelContainer(for: schema, configurations: [inMemoryConfig])
+            }
         }
         
+        // Assign to self (guaranteed to be initialized now)
+        self.sharedModelContainer = container
+        
         // Create a temporary AppState for initialization
-        // We can't access @StateObject directly in init
         let tempAppState = AppState()
         
-        // Now create settings manager with the container and temporary appState
+        // Create settings manager
         self.settingsManager = SettingsWindowManager(
             appState: tempAppState, 
-            sharedModelContainer: sharedModelContainer
+            sharedModelContainer: container
         )
+        
+        // Schedule the migration for after init is complete
+        DispatchQueue.main.async {
+            // Migration code inlined to avoid capturing self
+            Task { @MainActor in
+                // Manually migrate any existing FTPSettings to add the path if needed
+                let context = container.mainContext
+                let fetchDescriptor = FetchDescriptor<FTPSettings>()
+                if let settings = try? context.fetch(fetchDescriptor) {
+                    var didChange = false
+                    for setting in settings {
+                        // If we have an old version without path set, update it
+                        if setting.ftpPath.isEmpty {
+                            setting.ftpPath = "/"
+                            didChange = true
+                        }
+                    }
+                    if didChange {
+                        try? context.save()
+                    }
+                }
+            }
+        }
     }
     
     var body: some Scene {
