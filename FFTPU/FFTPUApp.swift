@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import OSLog
 
 @main
 struct FFTPUApp: App {
@@ -142,16 +143,52 @@ struct FFTPUApp: App {
         statusItemManager.setupStatusItem { url in
             // This closure is called when a file is dropped on the status item
             DispatchQueue.main.async {
+                let logger = Logger(subsystem: "com.FFTPU", category: "StatusItemDrop")
+                logger.info("File dropped on status item: \(url.lastPathComponent)")
+                
                 // Create FTPService and upload file
                 let modelContext = self.sharedModelContainer.mainContext
                 
                 // Query for FTPSettings
                 let fetchDescriptor = FetchDescriptor<FTPSettings>()
                 let ftpSettings = try? modelContext.fetch(fetchDescriptor)
-                let ftpService = FTPService(settings: ftpSettings?.first ?? FTPSettings())
+                
+                // Validate settings
+                if ftpSettings?.isEmpty ?? true {
+                    logger.error("No FTP settings found")
+                    let alert = NSAlert()
+                    alert.messageText = "No SFTP Settings"
+                    alert.informativeText = "Please configure your SFTP settings before uploading a file."
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                    
+                    // Open settings window
+                    self.settingsManager.showSettingsWindow()
+                    return
+                }
+                
+                let settings = ftpSettings!.first!
+                if settings.ftpServerURL.isEmpty || settings.ftpUsername.isEmpty || settings.ftpPassword.isEmpty {
+                    logger.error("Incomplete SFTP settings")
+                    let alert = NSAlert()
+                    alert.messageText = "Incomplete SFTP Settings"
+                    alert.informativeText = "Please complete your SFTP settings configuration before uploading."
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                    
+                    // Open settings window
+                    self.settingsManager.showSettingsWindow()
+                    return
+                }
+                
+                let ftpService = FTPService(settings: settings)
                 
                 // Create UploadedFile record
                 let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+                logger.debug("File size: \(fileSize) bytes")
+                
                 let uploadedFile = UploadedFile(
                     filename: url.lastPathComponent,
                     originalPath: url.path,
@@ -159,26 +196,37 @@ struct FFTPUApp: App {
                 )
                 
                 // Insert into model context and update app state
+                logger.debug("Inserting file record into model context")
                 modelContext.insert(uploadedFile)
-                self.appState.currentUpload = uploadedFile
+                self.appState.setCurrentUpload(uploadedFile)
                 
                 // Start upload
                 Task { @MainActor in
                     do {
+                        logger.debug("Starting FTP upload task")
                         let remoteURL = try await ftpService.uploadFile(localURL: url, uploadedFile: uploadedFile)
                         
+                        logger.info("Upload completed successfully, remote URL: \(remoteURL)")
                         uploadedFile.remoteURL = remoteURL
                         uploadedFile.isUploading = false
                         uploadedFile.uploadProgress = 1.0
-                        self.appState.currentUpload = nil
+                        self.appState.setCurrentUpload(nil)
+                        
+                        // Save model context
+                        try? modelContext.save()
                         
                         // Copy URL to clipboard automatically
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(remoteURL, forType: .string)
                     } catch {
+                        logger.error("Upload failed with error: \(error.localizedDescription)")
                         uploadedFile.isUploading = false
                         uploadedFile.errorMessage = error.localizedDescription
-                        self.appState.currentUpload = nil
+                        self.appState.logUploadError(uploadedFile, error: error)
+                        self.appState.setCurrentUpload(nil)
+                        
+                        // Save model context
+                        try? modelContext.save()
                     }
                 }
             }
@@ -197,4 +245,26 @@ class AppState: ObservableObject {
     @Published var isShowingSettings = false
     @Published var currentUpload: UploadedFile?
     @Published var recentUploads: [UploadedFile] = []
+    
+    private let logger = Logger(subsystem: "com.FFTPU", category: "AppState")
+    
+    init() {
+        logger.debug("AppState initialized")
+    }
+    
+    func setCurrentUpload(_ upload: UploadedFile?) {
+        if let upload = upload {
+            logger.debug("Starting upload: \(upload.filename)")
+            self.currentUpload = upload
+        } else {
+            if let previous = currentUpload {
+                logger.debug("Upload completed or failed: \(previous.filename)")
+            }
+            self.currentUpload = nil
+        }
+    }
+    
+    func logUploadError(_ upload: UploadedFile, error: Error) {
+        logger.error("Upload failed for \(upload.filename): \(error.localizedDescription)")
+    }
 }

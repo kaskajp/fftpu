@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
@@ -68,6 +69,25 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 8)
                 }
+                
+                Section("System Configuration") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        LabeledContent("Curl Path") {
+                            HStack {
+                                TextField("", text: $settings.curlPath)
+                                    .help("Path to the curl executable (e.g., /usr/bin/curl)")
+                                
+                                Button {
+                                    browseCurlPath()
+                                } label: {
+                                    Image(systemName: "folder")
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -85,7 +105,7 @@ struct SettingsView: View {
             .padding(.top, 20)
             .padding(.bottom, 20)
         }
-        .frame(width: 550, height: 450)
+        .frame(width: 550, height: 550) // Height reduced as we don't need the extra space for the warning
         .fixedSize()
         .onAppear {
             if let existingSettings = ftpSettings.first {
@@ -94,6 +114,30 @@ struct SettingsView: View {
                 let newSettings = FTPSettings()
                 modelContext.insert(newSettings)
                 settings = newSettings
+            }
+        }
+    }
+    
+    private func browseCurlPath() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.message = "Select the curl executable"
+        panel.prompt = "Select"
+        
+        // Set initial directory based on common curl locations
+        if FileManager.default.fileExists(atPath: "/usr/bin/curl") {
+            panel.directoryURL = URL(fileURLWithPath: "/usr/bin")
+        } else if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/curl") {
+            panel.directoryURL = URL(fileURLWithPath: "/opt/homebrew/bin")
+        }
+        
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                DispatchQueue.main.async {
+                    self.settings.curlPath = url.path
+                }
             }
         }
     }

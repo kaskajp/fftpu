@@ -21,7 +21,7 @@ class SettingsWindowManager: ObservableObject {
             let settingsView = SettingsView()
                 .environmentObject(appState)
                 .modelContainer(sharedModelContainer)
-                .frame(width: 550, height: 450)
+                .frame(width: 550, height: 550)
                 .fixedSize()
             
             window.contentView = NSHostingView(rootView: settingsView)
@@ -42,7 +42,7 @@ class SettingsWindowManager: ObservableObject {
         
         // Create a new window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 550, height: 450),
+            contentRect: NSRect(x: 0, y: 0, width: 550, height: 550),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -57,7 +57,7 @@ class SettingsWindowManager: ObservableObject {
         let settingsView = SettingsView()
             .environmentObject(appState)
             .modelContainer(sharedModelContainer)
-            .frame(width: 550, height: 450)
+            .frame(width: 550, height: 550)
             .fixedSize()
         
         window.contentView = NSHostingView(rootView: settingsView)
