@@ -63,7 +63,7 @@ struct FFTPUApp: App {
     private func setupStatusItem() {
         // Create popover for the menu
         let newPopover = NSPopover()
-        newPopover.contentSize = NSSize(width: 300, height: 400)
+        newPopover.contentSize = NSSize(width: 300, height: 300)
         newPopover.behavior = .transient
         
         // Set content view for the popover

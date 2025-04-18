@@ -9,9 +9,6 @@ struct MenuBarView: View {
     @Query private var recentUploads: [UploadedFile]
     @Query private var ftpSettings: [FTPSettings]
     
-    @State private var dragOver = false
-    @State private var isShowingFilePicker = false
-    
     // Function to open settings provided by the app
     var openSettings: () -> Void
     
@@ -21,12 +18,20 @@ struct MenuBarView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with title
+            // Header with title and buttons
             HStack {
                 Text("FFTPU")
                     .font(.headline)
                 
                 Spacer()
+                
+                Button {
+                    openFilePicker()
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 8)
                 
                 Button {
                     openSettings()
@@ -39,49 +44,16 @@ struct MenuBarView: View {
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(0.2))
             
-            // Drop zone - now also clickable
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(style: StrokeStyle(lineWidth: 2, dash: [6]))
-                    .foregroundColor(dragOver ? .accentColor : .gray)
-                    .background(dragOver ? Color.accentColor.opacity(0.1) : Color.clear)
-                    .frame(height: 100)
-                    .padding()
-                
-                VStack {
-                    Image(systemName: "arrow.up.doc")
-                        .font(.system(size: 24))
-                    Text("Drop files here or click to browse")
-                        .font(.subheadline)
-                }
-            }
-            .onDrop(of: [UTType.fileURL], isTargeted: $dragOver) { providers, _ in
-                for provider in providers {
-                    _ = provider.loadObject(ofClass: URL.self) { url, error in
-                        guard let url = url, error == nil else { return }
-                        DispatchQueue.main.async {
-                            uploadFile(url: url)
-                        }
-                    }
-                }
-                return true
-            }
-            .onTapGesture {
-                openFilePicker()
-            }
-            
-            Divider()
-            
             // Recent uploads list
             if recentUploads.isEmpty {
                 Text("No recent uploads")
                     .foregroundColor(.secondary)
-                    .padding()
+                    .padding(.top, 8)
             } else {
                 List {
                     ForEach(recentUploads.sorted(by: { $0.uploadDate > $1.uploadDate }).prefix(5)) { upload in
                         HStack {
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(upload.filename)
                                     .lineLimit(1)
                                 Text(upload.uploadDate, format: .dateTime)
@@ -116,7 +88,6 @@ struct MenuBarView: View {
                     }
                 }
                 .listStyle(.plain)
-                .frame(maxHeight: 300)
             }
         }
         .frame(width: 300)
