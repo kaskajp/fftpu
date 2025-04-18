@@ -36,7 +36,7 @@ class FTPService {
         FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
         
         // Build the curl command with the specified path
-        let protocolType = settings.useSFTP ? "sftp" : "ftp"
+        let protocolType = "sftp"
         
         // Normalize path to ensure it starts with / and doesn't end with /
         var normalizedPath = settings.ftpPath
@@ -62,15 +62,9 @@ class FTPService {
             "--user", "\(settings.ftpUsername):\(settings.ftpPassword)",
             "--stderr", stderrURL.path,
             "-#", // Show progress
+            "--insecure", // Skip SSL verification
             curlURL
         ]
-        
-        // Add SFTP specific options if needed
-        if settings.useSFTP {
-            arguments.append(contentsOf: [
-                "--insecure", // Skip SSL verification
-            ])
-        }
         
         process.arguments = arguments
         

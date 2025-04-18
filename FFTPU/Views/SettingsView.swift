@@ -12,9 +12,9 @@ struct SettingsView: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
-                Section("FTP Server Configuration") {
+                Section("SFTP Server Configuration") {
                     VStack(alignment: .leading, spacing: 16) {
-                        LabeledContent("FTP Server URL") {
+                        LabeledContent("SFTP Server URL") {
                             TextField("", text: $settings.ftpServerURL)
                                 .textContentType(.URL)
                         }
@@ -52,11 +52,6 @@ struct SettingsView: View {
                         LabeledContent("Upload Path") {
                             TextField("", text: $settings.ftpPath)
                                 .help("Directory on the server where files will be uploaded (e.g., /public_html/uploads)")
-                        }
-                        
-                        LabeledContent("Use SFTP") {
-                            Toggle("", isOn: $settings.useSFTP)
-                                .labelsHidden()
                         }
                     }
                     .padding(.vertical, 8)

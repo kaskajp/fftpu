@@ -15,8 +15,8 @@ final class FTPSettings {
         ftpServerURL: String = "",
         ftpUsername: String = "",
         ftpPassword: String = "",
-        ftpPort: Int = 21,
-        useSFTP: Bool = false,
+        ftpPort: Int = 22,
+        useSFTP: Bool = true,
         webServerURL: String = "",
         ftpPath: String = "/"
     ) {
