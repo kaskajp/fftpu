@@ -17,21 +17,19 @@ FFTPU (FTP Upload) is a macOS menu bar tool that allows you to quickly upload fi
 
 ## Requirements
 
-- macOS 14.0 or later
-- Xcode 15.0 or later for development
+- macOS 15.0 or later
+- Xcode 16.0 or later for development
 
 ## How to Use
 
 1. **First Time Setup**: Click on the gear icon in the app menu bar to open settings. Enter your FTP server details including:
-   - FTP server URL (e.g., `ftp.example.com`)
+   - SFTP server URL (e.g., `sftp.example.com`)
    - Username and password
-   - Port number (default is 21 for FTP, 22 for SFTP)
-   - SFTP toggle (on for SFTP, off for regular FTP)
+   - Port number (default is 22 for SFTP)
    - Web server URL where files will be accessible (e.g., `https://example.com/uploads/`)
 
 2. **Uploading Files**: 
-   - Click on the FFTPU icon in the menu bar
-   - Drag and drop a file onto the drop zone
+   - Drag and drop a file onto the menu bar icon, or click the plus button
    - The file will be uploaded to your FTP server
    - When complete, the URL will be automatically copied to your clipboard
 
@@ -41,10 +39,10 @@ FFTPU (FTP Upload) is a macOS menu bar tool that allows you to quickly upload fi
 
 ## How It Works
 
-FFTPU uses the `curl` command line tool to handle FTP/SFTP uploads. The app provides a simple user interface to configure the FTP server settings and upload files, then handles the connection and transfer process in the background.
+FFTPU uses the `curl` command line tool to handle SFTP uploads. The app provides a simple user interface to configure the FTP server settings and upload files, then handles the connection and transfer process in the background.
 
 ## Troubleshooting
 
-- If uploads fail, check your FTP server credentials and connection details
+- If uploads fail, check your SFTP server credentials and connection details
 - Make sure your web server URL is correctly configured to access the uploaded files
-- Check that your FTP server allows uploads to the specified directory
+- Check that your SFTP server allows uploads to the specified directory
