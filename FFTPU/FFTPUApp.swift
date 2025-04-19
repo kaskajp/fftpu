@@ -204,7 +204,18 @@ struct FFTPUApp: App {
                 Task { @MainActor in
                     do {
                         logger.debug("Starting FTP upload task")
-                        let remoteURL = try await ftpService.uploadFile(localURL: url, uploadedFile: uploadedFile)
+                        
+                        // Add progress tracking
+                        let progressHandler: (Double) -> Void = { progress in
+                            self.appState.updateUploadProgress(progress, filename: uploadedFile.filename)
+                            uploadedFile.uploadProgress = progress
+                        }
+                        
+                        let remoteURL = try await ftpService.uploadFile(
+                            localURL: url, 
+                            uploadedFile: uploadedFile,
+                            progressHandler: progressHandler
+                        )
                         
                         logger.info("Upload completed successfully, remote URL: \(remoteURL)")
                         uploadedFile.remoteURL = remoteURL
@@ -236,35 +247,10 @@ struct FFTPUApp: App {
         if let popover = self.popover {
             statusItemManager.setPopover(popover)
         }
+        
+        // Connect the AppState to the StatusItemManager for loading indicators
+        statusItemManager.setAppState(appState)
     }
 }
 
-// Main app state
-class AppState: ObservableObject {
-    @Published var isShowingDropZone = false
-    @Published var isShowingSettings = false
-    @Published var currentUpload: UploadedFile?
-    @Published var recentUploads: [UploadedFile] = []
-    
-    private let logger = Logger(subsystem: "com.FFTPU", category: "AppState")
-    
-    init() {
-        logger.debug("AppState initialized")
-    }
-    
-    func setCurrentUpload(_ upload: UploadedFile?) {
-        if let upload = upload {
-            logger.debug("Starting upload: \(upload.filename)")
-            self.currentUpload = upload
-        } else {
-            if let previous = currentUpload {
-                logger.debug("Upload completed or failed: \(previous.filename)")
-            }
-            self.currentUpload = nil
-        }
-    }
-    
-    func logUploadError(_ upload: UploadedFile, error: Error) {
-        logger.error("Upload failed for \(upload.filename): \(error.localizedDescription)")
-    }
-}
+// AppState class has been moved to AppState.swift
