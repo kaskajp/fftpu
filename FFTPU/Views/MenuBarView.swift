@@ -6,11 +6,26 @@ import OSLog
 
 private let logger = Logger(subsystem: "com.FFTPU", category: "MenuBarView")
 
+// Custom list style with no insets/padding
+struct NoInsetListStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 0)
+            .environment(\.defaultMinListHeaderHeight, 0)
+    }
+}
+
 struct MenuBarView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.modelContext) private var modelContext
     @Query private var recentUploads: [UploadedFile]
     @Query private var ftpSettings: [FTPSettings]
+    
+    // Scroll control state
+    @State private var scrollToTop = false
+    @State private var listId = UUID() // Force list reconstruction when needed
     
     // Function to open settings provided by the app
     var openSettings: () -> Void
@@ -47,62 +62,79 @@ struct MenuBarView: View {
             .padding(.vertical, 8)
             .background(Color.secondary.opacity(0.2))
             
-            // Recent uploads list
+            // Recent uploads list with zero space
             if recentUploads.isEmpty {
                 Text("No recent uploads")
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
                     .padding(.bottom, 8)
             } else {
-                List {
-                    ForEach(recentUploads.sorted(by: { $0.uploadDate > $1.uploadDate }).prefix(5)) { upload in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(upload.filename)
-                                    .lineLimit(1)
-                                Text(upload.uploadDate, format: .dateTime)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if upload.isUploading {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .scaleEffect(0.7)
-                            } else if upload.errorMessage != nil {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.red)
-                                    .help(upload.errorMessage ?? "Unknown error")
-                            } else {
-                                Button {
-                                    copyURLToClipboard(url: upload.remoteURL)
-                                } label: {
-                                    Image(systemName: "doc.on.clipboard")
+                // Use a custom approach that doesn't rely on ScrollViewReader
+                ZStack(alignment: .top) {
+                    // Background to ensure proper spacing and alignment
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(height: 0)
+                    
+                    // Actual content
+                    VStack(spacing: 0) {
+                        ForEach(recentUploads.sorted(by: { $0.uploadDate > $1.uploadDate }).prefix(5)) { upload in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(upload.filename)
+                                        .lineLimit(1)
+                                    Text(upload.uploadDate, format: .dateTime)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
                                 }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if !upload.isUploading && upload.errorMessage == nil {
-                                copyURLToClipboard(url: upload.remoteURL)
-                            } else if let errorMessage = upload.errorMessage {
-                                logger.error("Failed upload: \(upload.filename) with error: \(errorMessage)")
                                 
-                                // Show the error message in a dialog
-                                let alert = NSAlert()
-                                alert.messageText = "Upload Error"
-                                alert.informativeText = errorMessage
-                                alert.alertStyle = .warning
-                                alert.addButton(withTitle: "OK")
-                                alert.runModal()
+                                Spacer()
+                                
+                                if upload.isUploading {
+                                    ProgressView()
+                                        .progressViewStyle(.circular)
+                                        .scaleEffect(0.7)
+                                } else if upload.errorMessage != nil {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .foregroundColor(.red)
+                                        .help(upload.errorMessage ?? "Unknown error")
+                                } else {
+                                    Button {
+                                        copyURLToClipboard(url: upload.remoteURL)
+                                    } label: {
+                                        Image(systemName: "doc.on.clipboard")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 6)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if !upload.isUploading && upload.errorMessage == nil {
+                                    copyURLToClipboard(url: upload.remoteURL)
+                                } else if let errorMessage = upload.errorMessage {
+                                    logger.error("Failed upload: \(upload.filename) with error: \(errorMessage)")
+                                    
+                                    // Show the error message in a dialog
+                                    let alert = NSAlert()
+                                    alert.messageText = "Upload Error"
+                                    alert.informativeText = errorMessage
+                                    alert.alertStyle = .warning
+                                    alert.addButton(withTitle: "OK")
+                                    alert.runModal()
+                                }
+                            }
+                            
+                            if upload != recentUploads.sorted(by: { $0.uploadDate > $1.uploadDate }).prefix(5).last {
+                                Divider()
+                                    .padding(.horizontal)
                             }
                         }
                     }
+                    .background(Color(NSColor.controlBackgroundColor))
                 }
-                .listStyle(.plain)
+                .id(listId) // Force recreation when needed
             }
         }
         .frame(width: 300)
@@ -177,6 +209,9 @@ struct MenuBarView: View {
         logger.debug("Created UploadedFile record, inserting into model context")
         modelContext.insert(uploadedFile)
         appState.setCurrentUpload(uploadedFile)
+        
+        // Reset the list ID to force proper positioning
+        listId = UUID()
         
         // Start upload process using MainActor since FTPService is a MainActor class
         Task { @MainActor in
